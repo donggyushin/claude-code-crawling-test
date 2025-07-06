@@ -10,10 +10,20 @@ async function connectToMongoDB() {
     throw new Error('MONGODB_USERNAME and MONGODB_PASSWORD must be set in environment variables');
   }
   
-  const uri = `mongodb+srv://${username}:${password}@cluster0.qbhlio5.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+  const uri = `mongodb+srv://${username}:${password}@cluster0.qbhlio5.mongodb.net/myapp?retryWrites=true&w=majority&appName=Cluster0`;
+  
+  const options = {
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 30000,
+    socketTimeoutMS: 45000,
+    connectTimeoutMS: 30000,
+    bufferMaxEntries: 0,
+    ssl: true,
+    sslValidate: true
+  };
   
   try {
-    const client = new MongoClient(uri);
+    const client = new MongoClient(uri, options);
     await client.connect();
     db = client.db();
     console.log('MongoDB에 성공적으로 연결되었습니다.');
