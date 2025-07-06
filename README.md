@@ -34,6 +34,7 @@ The server will start on port 3000 by default, or use the `PORT` environment var
 ## API Endpoints
 
 - `GET /` - Health check endpoint returning server status
+- `GET /health` - Database connectivity health check
 
 ## Environment Variables
 
@@ -41,6 +42,8 @@ Create a `.env` file in the root directory:
 
 ```env
 PORT=3000
+MONGODB_USERNAME=your_mongodb_username
+MONGODB_PASSWORD=your_mongodb_password
 ```
 
 ## Dependencies
@@ -51,6 +54,7 @@ PORT=3000
 - **helmet** - Security middleware
 - **morgan** - HTTP request logger
 - **dotenv** - Environment variable loader
+- **mongodb** - MongoDB driver for Node.js
 
 ### Development
 - **nodemon** - Development server with auto-restart
