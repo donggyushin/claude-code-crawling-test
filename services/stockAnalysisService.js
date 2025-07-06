@@ -34,6 +34,18 @@ class StockAnalysisService {
     }
   }
 
+  // 주식 분석을 위한 기술적 지표(RSI, MACD, SMA) 조회
+  // 점수 계산 로직:
+  // - RSI > 70: -1점 (과매수, 매도 신호)
+  // - RSI < 30: +1점 (과매도, 매수 신호)
+  // - MACD > 0: +1점 (강세 모멘텀)
+  // - MACD < 0: -1점 (약세 모멘텀)
+  // - 현재가 > SMA50: +1점 (평균 상회, 강세)
+  // - 현재가 < SMA50: -1점 (평균 하회, 약세)
+  // - 거래량 > 평균의 1.5배: +0.5점 (높은 관심도)
+  // - 가격 변화 > 5%: +1점 (강한 상승세)
+  // - 가격 변화 < -5%: -1점 (강한 하락세)
+  // 최종 추천: 점수 >= 2 (매수), 점수 <= -2 (매도), 그 외 (보유)
   async getTechnicalIndicators(symbol) {
     try {
       const [rsiResponse, macdResponse, smaResponse] = await Promise.all([
