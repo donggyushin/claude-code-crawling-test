@@ -455,6 +455,305 @@ if result['success']:
     print(f"Saved to {result['fileData']['filename']}")
 ```
 
+#### POST /crawling/scrape-and-save-to-mongodb
+
+Scrapes venue data and saves it directly to MongoDB.
+
+**Request Body:**
+```json
+{
+  "collection": "venues"
+}
+```
+
+**Request Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `collection` | string | No | MongoDB collection name (default: "venues") |
+
+**Request Example:**
+```bash
+curl -X POST "http://localhost:3000/crawling/scrape-and-save-to-mongodb" \
+  -H "Content-Type: application/json" \
+  -d '{"collection": "seoul_venues"}'
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Successfully scraped 5 venues and saved to MongoDB",
+  "title": "서울 감성충전소 LP바/카페 LIST",
+  "scrapeData": {
+    "count": 5,
+    "venues": [
+      {
+        "name": "후로아",
+        "address": "중구 충무로2가",
+        "country": "KR",
+        "latitude": 37.56175342358275,
+        "longitude": 126.98796641235397,
+        "imageUrl": "http://d2m29rwiahucy3.cloudfront.net/images/store/S230729_1690642444676/썸네일.jpg",
+        "storeId": "S230729_1690642444676",
+        "tags": ["LP바", "카페", "감성", "서울", "데이트코스"]
+      }
+    ]
+  },
+  "mongoData": {
+    "success": true,
+    "inserted": 3,
+    "updated": 2,
+    "total": 5,
+    "collection": "venues"
+  }
+}
+```
+
+#### GET /crawling/venues
+
+Retrieves venue data from MongoDB with optional filtering.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `collection` | string | No | MongoDB collection name (default: "venues") |
+| `name` | string | No | Filter by venue name (case-insensitive regex) |
+| `address` | string | No | Filter by address (case-insensitive regex) |
+| `storeId` | string | No | Filter by exact store ID |
+
+**Request Examples:**
+```bash
+# Get all venues
+curl -X GET "http://localhost:3000/crawling/venues"
+
+# Filter by name
+curl -X GET "http://localhost:3000/crawling/venues?name=후로아"
+
+# Filter by address
+curl -X GET "http://localhost:3000/crawling/venues?address=중구"
+
+# Get from specific collection
+curl -X GET "http://localhost:3000/crawling/venues?collection=seoul_venues"
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Retrieved 5 venues from MongoDB",
+  "collection": "venues",
+  "data": [
+    {
+      "_id": "507f1f77bcf86cd799439011",
+      "name": "후로아",
+      "address": "중구 충무로2가",
+      "country": "KR",
+      "latitude": 37.56175342358275,
+      "longitude": 126.98796641235397,
+      "imageUrl": "http://d2m29rwiahucy3.cloudfront.net/images/store/S230729_1690642444676/썸네일.jpg",
+      "storeId": "S230729_1690642444676",
+      "tags": ["LP바", "카페", "감성", "서울", "데이트코스"],
+      "createdAt": "2025-07-06T10:30:00.000Z",
+      "updatedAt": "2025-07-06T10:30:00.000Z"
+    }
+  ]
+}
+```
+
+#### DELETE /crawling/venues
+
+Deletes venue data from MongoDB with optional filtering.
+
+**Request Body:**
+```json
+{
+  "collection": "venues",
+  "storeId": "S230729_1690642444676"
+}
+```
+
+**Request Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `collection` | string | No | MongoDB collection name (default: "venues") |
+| `storeId` | string | No | Delete specific venue by store ID |
+| `name` | string | No | Delete venues by exact name match |
+
+**Request Examples:**
+```bash
+# Delete specific venue by store ID
+curl -X DELETE "http://localhost:3000/crawling/venues" \
+  -H "Content-Type: application/json" \
+  -d '{"storeId": "S230729_1690642444676"}'
+
+# Delete all venues (use with caution!)
+curl -X DELETE "http://localhost:3000/crawling/venues" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Deleted 1 venues from MongoDB",
+  "collection": "venues",
+  "deletedCount": 1
+}
+```
+
+### MongoDB Data Structure
+
+When data is saved to MongoDB, each venue document includes additional metadata:
+
+```json
+{
+  "_id": "ObjectId",
+  "name": "후로아",
+  "address": "중구 충무로2가",
+  "country": "KR",
+  "latitude": 37.56175342358275,
+  "longitude": 126.98796641235397,
+  "imageUrl": "http://d2m29rwiahucy3.cloudfront.net/images/store/S230729_1690642444676/썸네일.jpg",
+  "storeId": "S230729_1690642444676",
+  "tags": ["LP바", "카페", "감성", "서울", "데이트코스"],
+  "createdAt": "2025-07-06T10:30:00.000Z",
+  "updatedAt": "2025-07-06T10:30:00.000Z"
+}
+```
+
+**Additional Fields:**
+- `_id`: MongoDB ObjectId (auto-generated)
+- `createdAt`: Timestamp when the document was first created
+- `updatedAt`: Timestamp when the document was last updated
+
+**Upsert Behavior:**
+- Documents are upserted based on the `storeId` field
+- If a venue with the same `storeId` exists, it will be updated
+- If no venue exists with that `storeId`, a new document will be created
+
+#### GET /crawling/store/{storeId}
+
+Fetches detailed information for a specific store using its store ID.
+
+**URL Parameters:**
+- `storeId` (required): Store identifier (e.g., S230729_1690642444676)
+
+**Request Example:**
+```bash
+curl -X GET "http://localhost:3000/crawling/store/S230729_1690642444676"
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Successfully retrieved store details for S230729_1690642444676",
+  "data": {
+    "storeId": "S230729_1690642444676",
+    "storeUrl": "https://xn--2s2b33eb3kgvpta.com/store/S230729_1690642444676",
+    "name": "후로아",
+    "description": "@furoa.seoul\n음악과 패션 그리고 카페. 브런치와 다양한 카페 메뉴를 함께 즐길 수 있는 LP판들이 가득 담긴 카페.",
+    "address": {
+      "full": "충무로2가 61-2 1층",
+      "locality": "중구",
+      "region": "서울특별시",
+      "country": "KR"
+    },
+    "phone": "0507-1353-0857",
+    "rating": 4.3,
+    "reviewCount": 8,
+    "latitude": 37.56175342358275,
+    "longitude": 126.98796641235397,
+    "images": [
+      "http://d2m29rwiahucy3.cloudfront.net/images/store/S230729_1690642444676/썸네일.jpg",
+      "http://d2m29rwiahucy3.cloudfront.net/images/store/S230729_1690642444676/방문자6.jpg"
+    ],
+    "additionalImages": [
+      "http://d2m29rwiahucy3.cloudfront.net/images/store/S230729_1690642444676/1.jpg"
+    ]
+  }
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | boolean | Indicates if the request was successful |
+| `message` | string | Success message with store ID |
+| `data` | object | Store detail information |
+| `data.storeId` | string | Unique store identifier |
+| `data.storeUrl` | string | Full URL to the store page |
+| `data.name` | string | Store name |
+| `data.description` | string | Detailed store description |
+| `data.address` | object | Address information |
+| `data.address.full` | string | Full street address |
+| `data.address.locality` | string | City/District |
+| `data.address.region` | string | State/Province |
+| `data.address.country` | string | Country code |
+| `data.phone` | string | Contact phone number |
+| `data.rating` | number | Average rating (1-5 scale) |
+| `data.reviewCount` | number | Number of reviews |
+| `data.latitude` | number | Latitude coordinates |
+| `data.longitude` | number | Longitude coordinates |
+| `data.images` | array | Array of main store image URLs |
+| `data.additionalImages` | array | Array of additional gallery image URLs |
+| `data.businessHours` | string | Business hours (if available) |
+
+**Error Response (400 Bad Request):**
+```json
+{
+  "success": false,
+  "message": "Store ID is required"
+}
+```
+
+**Error Response (500 Internal Server Error):**
+```json
+{
+  "success": false,
+  "message": "Failed to retrieve store details",
+  "error": "Store not found or network error"
+}
+```
+
+### Example Usage
+
+#### JavaScript (Fetch API)
+```javascript
+// Get store details
+fetch('http://localhost:3000/crawling/store/S230729_1690642444676')
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      console.log('Store Name:', data.data.name);
+      console.log('Rating:', data.data.rating);
+      console.log('Phone:', data.data.phone);
+      console.log('Description:', data.data.description);
+    }
+  });
+```
+
+#### Python (requests)
+```python
+import requests
+
+store_id = "S230729_1690642444676"
+response = requests.get(f'http://localhost:3000/crawling/store/{store_id}')
+data = response.json()
+
+if data['success']:
+    store = data['data']
+    print(f"Store: {store['name']}")
+    print(f"Rating: {store['rating']}/5 ({store['reviewCount']} reviews)")
+    print(f"Address: {store['address']['full']}")
+    print(f"Phone: {store['phone']}")
+```
+
 ### Notes
 - The scraper targets a specific Korean website about Seoul date course venues
 - Data includes LP bars and cafes with their locations and details
@@ -463,3 +762,7 @@ if result['success']:
 - Tags provide categorization for each venue (LP바, 카페, 감성, 서울, 데이트코스)
 - The title field contains the collection name from the source website
 - Store ID is a unique identifier extracted from the venue URL for reference
+- MongoDB operations require a valid database connection configured in environment variables
+- All MongoDB operations use upsert logic to prevent duplicate entries based on `storeId`
+- Store detail API provides comprehensive information including ratings, reviews, and image galleries
+- Store IDs can be obtained from the main venue listing API endpoints

@@ -2,6 +2,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const fs = require('fs').promises;
 const path = require('path');
+const { getDB } = require('../db');
 
 class CrawlingService {
     constructor() {
@@ -162,6 +163,210 @@ class CrawlingService {
 
     clearData() {
         this.data = [];
+    }
+
+    async saveToMongoDB(collectionName = 'venues') {
+        const db = getDB();
+        if (!db) {
+            throw new Error('MongoDB connection not available');
+        }
+
+        if (this.data.length === 0) {
+            throw new Error('No data to save to MongoDB');
+        }
+
+        try {
+            const collection = db.collection(collectionName);
+            
+            // Use upsert to avoid duplicates based on storeId
+            const bulkOps = this.data.map(venue => ({
+                updateOne: {
+                    filter: { storeId: venue.storeId },
+                    update: { 
+                        $set: { 
+                            ...venue, 
+                            updatedAt: new Date() 
+                        },
+                        $setOnInsert: { 
+                            createdAt: new Date() 
+                        }
+                    },
+                    upsert: true
+                }
+            }));
+
+            const result = await collection.bulkWrite(bulkOps);
+
+            return {
+                success: true,
+                inserted: result.upsertedCount,
+                updated: result.modifiedCount,
+                total: this.data.length,
+                collection: collectionName
+            };
+
+        } catch (error) {
+            console.error('Error saving to MongoDB:', error.message);
+            throw error;
+        }
+    }
+
+    async getFromMongoDB(collectionName = 'venues', filter = {}) {
+        const db = getDB();
+        if (!db) {
+            throw new Error('MongoDB connection not available');
+        }
+
+        try {
+            const collection = db.collection(collectionName);
+            const venues = await collection.find(filter).toArray();
+
+            return {
+                success: true,
+                count: venues.length,
+                data: venues
+            };
+
+        } catch (error) {
+            console.error('Error retrieving from MongoDB:', error.message);
+            throw error;
+        }
+    }
+
+    async deleteFromMongoDB(collectionName = 'venues', filter = {}) {
+        const db = getDB();
+        if (!db) {
+            throw new Error('MongoDB connection not available');
+        }
+
+        try {
+            const collection = db.collection(collectionName);
+            const result = await collection.deleteMany(filter);
+
+            return {
+                success: true,
+                deletedCount: result.deletedCount,
+                collection: collectionName
+            };
+
+        } catch (error) {
+            console.error('Error deleting from MongoDB:', error.message);
+            throw error;
+        }
+    }
+
+    async scrapeAndSaveToMongoDB(collectionName = 'venues') {
+        try {
+            // First scrape the data
+            const scrapeResult = await this.scrapeVenues();
+            
+            if (!scrapeResult.success) {
+                return scrapeResult;
+            }
+
+            // Then save to MongoDB
+            const saveResult = await this.saveToMongoDB(collectionName);
+
+            return {
+                success: true,
+                title: scrapeResult.title,
+                scrapeData: {
+                    count: scrapeResult.count,
+                    venues: scrapeResult.data
+                },
+                mongoData: saveResult
+            };
+
+        } catch (error) {
+            console.error('Error in scrapeAndSaveToMongoDB:', error.message);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    async scrapeStoreDetail(storeId) {
+        try {
+            const storeUrl = `https://xn--2s2b33eb3kgvpta.com/store/${storeId}`;
+            const response = await axios.get(storeUrl, { headers: this.headers });
+            const $ = cheerio.load(response.data);
+            
+            let storeDetail = {
+                storeId: storeId,
+                storeUrl: storeUrl
+            };
+
+            // Extract JSON-LD structured data
+            const jsonScripts = $('script[type="application/ld+json"]');
+            
+            jsonScripts.each((index, element) => {
+                try {
+                    const jsonContent = $(element).html();
+                    const jsonData = JSON.parse(jsonContent);
+                    
+                    if (jsonData['@type'] === 'LocalBusiness') {
+                        storeDetail = {
+                            ...storeDetail,
+                            name: jsonData.name || '',
+                            description: jsonData.description || '',
+                            address: {
+                                full: jsonData.address?.streetAddress || '',
+                                locality: jsonData.address?.addressLocality || '',
+                                region: jsonData.address?.addressRegion || '',
+                                country: jsonData.address?.addressCountry || ''
+                            },
+                            phone: jsonData.telephone || '',
+                            rating: jsonData.aggregateRating?.ratingValue || null,
+                            reviewCount: jsonData.aggregateRating?.reviewCount || 0,
+                            latitude: jsonData.geo?.latitude || '',
+                            longitude: jsonData.geo?.longitude || '',
+                            images: jsonData.image || []
+                        };
+                    }
+                } catch (parseError) {
+                    console.warn('Failed to parse JSON-LD in store detail:', parseError.message);
+                }
+            });
+
+            // Extract additional details from HTML if needed
+            try {
+                // Extract business hours if available
+                const hoursElement = $('.hours, .business-hours, [class*="hour"]');
+                if (hoursElement.length > 0) {
+                    storeDetail.businessHours = hoursElement.text().trim();
+                }
+
+                // Extract additional images from gallery
+                const imageElements = $('img[src*="/images/"]');
+                const additionalImages = [];
+                imageElements.each((i, img) => {
+                    const imgSrc = $(img).attr('src');
+                    if (imgSrc && !additionalImages.includes(imgSrc)) {
+                        additionalImages.push(imgSrc);
+                    }
+                });
+                
+                if (additionalImages.length > 0) {
+                    storeDetail.additionalImages = additionalImages;
+                }
+            } catch (htmlParseError) {
+                console.warn('Failed to parse additional HTML details:', htmlParseError.message);
+            }
+
+            return {
+                success: true,
+                data: storeDetail
+            };
+
+        } catch (error) {
+            console.error('Error scraping store detail:', error.message);
+            return {
+                success: false,
+                error: error.message,
+                data: null
+            };
+        }
     }
 }
 
