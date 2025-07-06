@@ -91,6 +91,9 @@ class StockAnalysisService {
   }
 
   analyzeStock(stockData, technicalData) {
+    console.log('Raw stockData keys:', Object.keys(stockData));
+    console.log('Full stockData:', JSON.stringify(stockData, null, 2));
+    
     const timeSeries = stockData['Time Series (Daily)'];
     
     if (!timeSeries) {
