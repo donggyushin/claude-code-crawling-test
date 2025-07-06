@@ -88,7 +88,7 @@ MONGODB_PASSWORD=your_mongodb_password
 5. **Deploy**
    - Click "Create Web Service"
    - Wait for deployment (2-3 minutes)
-   - Your app will be live at `https://your-app-name.onrender.com`
+   - Your app will be live at `https://claude-code-crawling-test.onrender.com`
 
 ### Testing Deployment
 - Visit `/` for basic health check
