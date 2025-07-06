@@ -26,6 +26,7 @@
   "homepage": "https://github.com/donggyushin/claude-code-crawling-test#readme",
   "dependencies": {
     "axios": "^1.10.0",
+    "cheerio": "^1.1.0",
     "cors": "^2.8.5",
     "dotenv": "^17.0.1",
     "express": "^5.1.0",
