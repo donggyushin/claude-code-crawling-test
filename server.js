@@ -39,11 +39,26 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// 404 핸들러
+app.use('*', (req, res) => {
+  res.status(404).json({ error: '요청한 엔드포인트를 찾을 수 없습니다.' });
+});
+
+// 전역 에러 핸들러
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ 
+    error: '서버 내부 오류가 발생했습니다.',
+    ...(process.env.NODE_ENV === 'development' && { details: err.message })
+  });
+});
+
 async function startServer() {
   try {
     await connectToMongoDB();
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`서버가 ${PORT}번 포트에서 실행중입니다.`);
+      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     });
   } catch (error) {
     console.error('서버 시작 실패:', error);

@@ -59,6 +59,41 @@ MONGODB_PASSWORD=your_mongodb_password
 ### Development
 - **nodemon** - Development server with auto-restart
 
+## Deployment
+
+### Deploy to Render (Recommended)
+
+1. **Push to GitHub**
+   ```bash
+   git add .
+   git commit -m "Prepare for deployment"
+   git push origin main
+   ```
+
+2. **Create Render Account**
+   - Go to [render.com](https://render.com)
+   - Sign up with GitHub
+
+3. **Deploy**
+   - Click "New +" → "Web Service"
+   - Connect your GitHub repository
+   - Render will auto-detect settings from `render.yaml`
+
+4. **Set Environment Variables**
+   - In Render dashboard, go to Environment
+   - Add:
+     - `MONGODB_USERNAME`: your MongoDB username
+     - `MONGODB_PASSWORD`: your MongoDB password
+
+5. **Deploy**
+   - Click "Create Web Service"
+   - Wait for deployment (2-3 minutes)
+   - Your app will be live at `https://your-app-name.onrender.com`
+
+### Testing Deployment
+- Visit `/` for basic health check
+- Visit `/health` for database connectivity check
+
 ## License
 
 ISC
