@@ -2,27 +2,23 @@ const axios = require('axios');
 
 class StockAnalysisService {
   constructor() {
-    this.ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY || 'demo';
+    this.API_KEYS = process.env.ALPHA_VANTAGE_API_KEY ? 
+      process.env.ALPHA_VANTAGE_API_KEY.split(',').map(key => key.trim()) : 
+      ['demo'];
+    this.currentKeyIndex = 0;
     this.BASE_URL = 'https://www.alphavantage.co/query';
   }
 
   async getStockData(symbol) {
     try {
-      const response = await axios.get(this.BASE_URL, {
-        params: {
-          function: 'TIME_SERIES_DAILY',
-          symbol: symbol,
-          apikey: this.ALPHA_VANTAGE_API_KEY,
-          outputsize: 'compact'
-        }
+      const response = await this.makeApiCall({
+        function: 'TIME_SERIES_DAILY',
+        symbol: symbol,
+        outputsize: 'compact'
       });
 
       if (response.data['Error Message']) {
         throw new Error('Invalid stock symbol');
-      }
-
-      if (response.data['Note']) {
-        throw new Error('API call frequency limit reached');
       }
 
       return response.data;
@@ -49,44 +45,30 @@ class StockAnalysisService {
   async getTechnicalIndicators(symbol) {
     try {
       const [rsiResponse, macdResponse, smaResponse] = await Promise.all([
-        axios.get(this.BASE_URL, {
-          params: {
-            function: 'RSI',
-            symbol: symbol,
-            interval: 'daily',
-            time_period: 14,
-            series_type: 'close',
-            apikey: this.ALPHA_VANTAGE_API_KEY
-          }
+        this.makeApiCall({
+          function: 'RSI',
+          symbol: symbol,
+          interval: 'daily',
+          time_period: 14,
+          series_type: 'close'
         }),
-        axios.get(this.BASE_URL, {
-          params: {
-            function: 'MACD',
-            symbol: symbol,
-            interval: 'daily',
-            series_type: 'close',
-            apikey: this.ALPHA_VANTAGE_API_KEY
-          }
+        this.makeApiCall({
+          function: 'MACD',
+          symbol: symbol,
+          interval: 'daily',
+          series_type: 'close'
         }),
-        axios.get(this.BASE_URL, {
-          params: {
-            function: 'SMA',
-            symbol: symbol,
-            interval: 'daily',
-            time_period: 50,
-            series_type: 'close',
-            apikey: this.ALPHA_VANTAGE_API_KEY
-          }
+        this.makeApiCall({
+          function: 'SMA',
+          symbol: symbol,
+          interval: 'daily',
+          time_period: 50,
+          series_type: 'close'
         })
       ]);
 
-      // Check for API errors in technical indicators
       if (rsiResponse.data['Error Message'] || macdResponse.data['Error Message'] || smaResponse.data['Error Message']) {
         throw new Error('Invalid stock symbol for technical indicators');
-      }
-
-      if (rsiResponse.data['Note'] || macdResponse.data['Note'] || smaResponse.data['Note']) {
-        throw new Error('API call frequency limit reached for technical indicators');
       }
 
       return {
@@ -214,6 +196,36 @@ class StockAnalysisService {
   calculateAverageVolume(timeSeries, dates) {
     const volumes = dates.map(date => parseInt(timeSeries[date]['5. volume']));
     return volumes.reduce((sum, vol) => sum + vol, 0) / volumes.length;
+  }
+
+  getNextApiKey() {
+    const key = this.API_KEYS[this.currentKeyIndex];
+    this.currentKeyIndex = (this.currentKeyIndex + 1) % this.API_KEYS.length;
+    return key;
+  }
+
+  async makeApiCall(params, retries = this.API_KEYS.length) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const apiKey = this.getNextApiKey();
+        const response = await axios.get(this.BASE_URL, {
+          params: { ...params, apikey: apiKey }
+        });
+
+        if (response.data['Note']) {
+          console.log(`API key ${apiKey} limit reached, trying next key...`);
+          continue;
+        }
+
+        return response;
+      } catch (error) {
+        if (i === retries - 1) {
+          throw error;
+        }
+        console.log(`API call failed with key, trying next key...`);
+      }
+    }
+    throw new Error('All API keys exhausted');
   }
 
   async analyzeStockSymbol(symbol) {
